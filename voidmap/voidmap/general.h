@@ -7,3 +7,4 @@
 
 #include "console.h"
 #include "utils.h"
+#include "mapper.h"
