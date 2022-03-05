@@ -3,7 +3,7 @@
 PVOID UtilsReadFile(const char* path, SIZE_T* fileSize)
 {
     HANDLE fileHandle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                                    FILE_ATTRIBUTE_NORMAL, NULL);
+        FILE_ATTRIBUTE_NORMAL, NULL);
     if (fileHandle == INVALID_HANDLE_VALUE)
         return NULL;
 

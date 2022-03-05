@@ -12,7 +12,6 @@ PVOID driverBuffer;
 // it like this
 __forceinline int CustomCompare(const char* a, const char* b)
 {
-
     while (*a && *a == *b) { ++a; ++b; }
     return (int)(unsigned char)(*a) - (int)(unsigned char)(*b);
 }
@@ -113,16 +112,16 @@ void KernelCallback(void* first, void* second)
     }
 
     PIMAGE_IMPORT_DESCRIPTOR importDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((DWORD64)imageBuffer + importsRva);
-    for (; importDescriptor->FirstThunk; ++importDescriptor) 
+    for (; importDescriptor->FirstThunk; ++importDescriptor)
     {
         PIMAGE_THUNK_DATA64 thunk = (PIMAGE_THUNK_DATA64)((DWORD64)imageBuffer + importDescriptor->FirstThunk);
         PIMAGE_THUNK_DATA64 thunkOriginal = (PIMAGE_THUNK_DATA64)((DWORD64)imageBuffer + importDescriptor->OriginalFirstThunk);
 
-        for (; thunk->u1.AddressOfData; ++thunk, ++thunkOriginal) 
+        for (; thunk->u1.AddressOfData; ++thunk, ++thunkOriginal)
         {
             PCHAR importName = ((PIMAGE_IMPORT_BY_NAME)((DWORD64)imageBuffer + thunkOriginal->u1.AddressOfData))->Name;
             ULONG64 import = ResolveExport(kernelBase, importName);
-            if (!import) 
+            if (!import)
             {
                 mapStatus = STATUS_NOT_FOUND;
                 return;
@@ -133,7 +132,7 @@ void KernelCallback(void* first, void* second)
     }
 
     PIMAGE_DATA_DIRECTORY baseRelocDir = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-    if (baseRelocDir->VirtualAddress) 
+    if (baseRelocDir->VirtualAddress)
     {
         PIMAGE_BASE_RELOCATION reloc = (PIMAGE_BASE_RELOCATION)((DWORD64)imageBuffer + baseRelocDir->VirtualAddress);
         for (UINT32 currentSize = 0; currentSize < baseRelocDir->Size; )
@@ -148,7 +147,8 @@ void KernelCallback(void* first, void* second)
                 USHORT type = data >> 12;
                 USHORT offset = data & 0xFFF;
 
-                switch (type) {
+                switch (type)
+                {
                 case IMAGE_REL_BASED_ABSOLUTE:
                     break;
                 case IMAGE_REL_BASED_DIR64:

@@ -59,7 +59,7 @@ DHPDEV CallerHookedFunction(DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HS
 
     ConsoleInfo("Spraying palettes...");
     CallerSprayPalettes(0xe20);
-    ConsoleSuccess("Spaying done");
+    ConsoleSuccess("Spraying done");
 
     return original;
 }
@@ -242,7 +242,8 @@ BOOL CallerDestroy()
     if (!status)
     {
         ConsoleWarning("Failed to free DC!");
-    } else
+    }
+    else
     {
         ConsoleSuccess("DC freed");
     }

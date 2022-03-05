@@ -2,22 +2,22 @@
 
 enum ConsoleColor
 {
-	Default,
-	DarkBlue,
-	DarkGreen,
-	DarkCyan,
-	DarkRed,
-	DarkPurple,
-	DarkYellow,
-	DarkWhite,
-	DarkGrey,
-	DarkBlueLite,
-	Green,
-	Cyan,
-	Red,
-	Purple,
-	Yellow,
-	White
+    Default,
+    DarkBlue,
+    DarkGreen,
+    DarkCyan,
+    DarkRed,
+    DarkPurple,
+    DarkYellow,
+    DarkWhite,
+    DarkGrey,
+    DarkBlueLite,
+    Green,
+    Cyan,
+    Red,
+    Purple,
+    Yellow,
+    White
 };
 
 void ConsoleBase(enum ConsoleColor color, const char* prefix, const char* text, va_list args);

