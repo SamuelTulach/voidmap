@@ -19,6 +19,9 @@
     <ClCompile Include="mapper.c">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="caller.c">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="general.h">
@@ -31,6 +34,9 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="mapper.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="caller.h">
       <Filter>Source</Filter>
     </ClInclude>
   </ItemGroup>

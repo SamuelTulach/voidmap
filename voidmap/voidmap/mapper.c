@@ -1,12 +1,11 @@
 #include "general.h"
 
-typedef void(*VoidFunc_t)();
+BOOL kernelCallbackCalled = FALSE;
 
 void KernelCallback(void* first, void* second)
 {
     UNREFERENCED_PARAMETER(first);
     UNREFERENCED_PARAMETER(second);
 
-    VoidFunc_t test = (VoidFunc_t)0xFEEDFEADFEED;
-    test();
+    kernelCallbackCalled = TRUE;
 }

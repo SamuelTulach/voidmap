@@ -143,12 +143,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="caller.c" />
     <ClCompile Include="console.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="mapper.c" />
     <ClCompile Include="utils.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="caller.h" />
     <ClInclude Include="console.h" />
     <ClInclude Include="general.h" />
     <ClInclude Include="mapper.h" />
