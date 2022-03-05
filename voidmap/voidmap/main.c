@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
     ConsoleSuccess("Driver timestamp: %llu", imageHeaders->FileHeader.TimeDateStamp);
 
     ConsoleInfo("Getting kernel base...");
-    PVOID kernelBase = UtilsGetModuleBase("ntoskrnl.exe");
+    kernelBase = UtilsGetModuleBase("ntoskrnl.exe");
     if (!kernelBase)
     {
         ConsoleError("Could not get kernel base address!");
@@ -115,7 +115,15 @@ int main(int argc, char* argv[])
 
     ConsoleSuccess("Callback called");
 
-    ConsoleInfo("Waiting on driver map...");
+    ConsoleInfo("Checking status...");
+    if (mapStatus == STATUS_SUCCESS)
+    {
+        ConsoleSuccess("Driver was mapped successfully!");
+        ConsoleSuccess("Driver status: 0x%p", driverStatus);
+    } else
+    {
+        ConsoleError("Failed driver map: 0x%p", mapStatus);
+    }
 
     // TODO: restore CR4 somehow...
 }
