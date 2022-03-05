@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     ConsoleInfo("Reading driver file...");
     const char* driverFilePath = argv[1];
     SIZE_T driverFileSize;
-    PVOID driverBuffer = UtilsReadFile(driverFilePath, &driverFileSize);
+    driverBuffer = UtilsReadFile(driverFilePath, &driverFileSize);
     if (!driverBuffer)
     {
         ConsoleError("Failed to read driver file!");
@@ -106,13 +106,16 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    ConsoleInfo("Waiting on kernel callback...");
-    while (!kernelCallbackCalled)
+    ConsoleInfo("Checking kernel callback...");
+    if (!kernelCallbackCalled)
     {
-        Sleep(1);
+        ConsoleError("Callback function was not called, exploit was unsuccessful!");
+        return -1;
     }
 
-    ConsoleSuccess("Kernel callback called");
+    ConsoleSuccess("Callback called");
 
     ConsoleInfo("Waiting on driver map...");
+
+    // TODO: restore CR4 somehow...
 }
