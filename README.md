@@ -11,5 +11,6 @@ There are two main problems with this approach:
 - There is no easy way to read the original cr4 value which means that I had to hardcode the value that was there on my system. While it *should* be the same for most modern CPUs, you should still double-check that the value is correct.
 
 Video:
+
 [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/9zHR2Lz1GrM/0.jpg)](https://www.youtube.com/watch?v=9zHR2Lz1GrM)
 
